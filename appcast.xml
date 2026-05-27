@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>CCBar Updates</title>
+    <link>https://findingdory0-0.github.io/CCBar/appcast.xml</link>
+    <description>Auto-update feed for CCBar — Claude Code menu bar app.</description>
+    <language>en</language>
+    <item>
+      <title>CCBar 0.1.0</title>
+      <sparkle:version>0.1.0</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <pubDate>2026-05-27T23:56:33Z</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[CCBar 0.1.0
+
+### Install
+1. Download `CCBar-0.1.0.zip` below
+2. Unzip → drag `CCBar.app` to `/Applications`
+3. First launch will ask for Accessibility + Apple Events permissions
+
+_Auto-update is live — future versions install themselves via Sparkle._
+]]></description>
+      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.0/CCBar-0.1.0.zip"
+                 length="1973315"
+                 type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>
