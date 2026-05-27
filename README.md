@@ -15,6 +15,28 @@ swift run ccbar-cli watch        # 실시간 tail
 open build/CCBar.app             # 실행
 ```
 
+## 릴리즈 (개발자 전용)
+
+```bash
+./scripts/release.sh 0.2.0       # 빌드 → zip → tag → GitHub Release → appcast 갱신
+```
+
+자동화 흐름:
+1. `CCBAR_VERSION` 환경변수로 `build-app.sh --release` 호출, ad-hoc 서명된 `CCBar.app` 생성
+2. `ditto -c -k --keepParent --sequesterRsrc` 로 `CCBar-<버전>.zip` 패키징
+3. `v<버전>` 태그 push, `gh release create` 로 GitHub Release 에 zip 첨부
+4. `scripts/generate-appcast.sh` 가 모든 published release 를 읽어 `appcast.xml` 재생성 → `gh-pages` 브랜치에 push
+
+### 첫 릴리즈 전에 한 번 할 일
+- repo Settings → Pages → Source: `gh-pages` 브랜치 / `/ (root)` 활성화
+- `gh auth login` (gh CLI 인증)
+- `gh-pages` 브랜치는 `generate-appcast.sh` 가 첫 실행 시 자동 생성
+
+### 사용자 측 자동 업데이트
+`SUFeedURL = https://findingdory0-0.github.io/CCBar/appcast.xml`. Sparkle 이 일 1회 백그라운드 점검 + ⚙ → "업데이트 확인" 으로 수동 점검. 새 버전 발견 시 zip 다운로드 → 자동 설치 → 재시작.
+
+EdDSA 서명은 현재 미적용. HTTPS transport (`api.github.com` / `objects.githubusercontent.com`) 가 무결성 보장. 필요해지면 `.build/artifacts/sparkle/Sparkle/bin/generate_keys` 로 도입 가능.
+
 ## 레이아웃
 
 ```
