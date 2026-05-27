@@ -71,7 +71,7 @@ CCBAR_FEED_URL="$FEED_URL" \
 APP_DIR="$PROJECT_ROOT/build/$APP_NAME.app"
 [[ -d "$APP_DIR" ]] || { echo "✘ build did not produce $APP_DIR"; exit 1; }
 
-echo "▸ Packaging $ZIP_NAME…"
+echo "▸ Packaging ${ZIP_NAME}…"
 rm -f "$ZIP_PATH"
 # `ditto -c -k --keepParent` is the standard macOS app zipping recipe —
 # preserves extended attributes and the .app's directory structure so
