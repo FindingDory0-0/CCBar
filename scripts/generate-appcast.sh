@@ -92,10 +92,12 @@ HEAD
 TAIL
 } > "$APPCAST"
 
-if git -C "$WORKTREE" diff --quiet appcast.xml; then
+# Stage first so an untracked appcast.xml (first run) is also visible to the
+# diff. `git diff --quiet appcast.xml` alone misses new files.
+git -C "$WORKTREE" add appcast.xml
+if git -C "$WORKTREE" diff --cached --quiet; then
     echo "  ✓ appcast.xml unchanged"
 else
-    git -C "$WORKTREE" add appcast.xml
     git -C "$WORKTREE" \
         -c user.email="saleslogis.ai@gmail.com" \
         -c user.name="FindingDory0-0" \
