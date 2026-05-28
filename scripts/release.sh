@@ -63,8 +63,11 @@ if [[ "$BRANCH" != "main" ]]; then
 fi
 
 echo "▸ Building CCBar.app v$VERSION (release config)…"
+# Let build-app.sh derive CFBundleVersion from CCBAR_VERSION (= marketing
+# version). They MUST match the appcast's sparkle:version, which is also the
+# marketing version — a timestamp build number here would break Sparkle's
+# comparison.
 CCBAR_VERSION="$VERSION" \
-CCBAR_BUILD="$(date +%Y%m%d%H%M)" \
 CCBAR_FEED_URL="$FEED_URL" \
     "$PROJECT_ROOT/scripts/build-app.sh" --release
 

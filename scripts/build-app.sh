@@ -24,7 +24,14 @@ BUNDLE_ID="com.ccbar.menubar"
 # Version can be overridden by release.sh (`CCBAR_VERSION=0.2.0 ./build-app.sh --release`);
 # everyday `swift build` runs default to 0.0.0-dev so they're clearly not a release.
 APP_VERSION="${CCBAR_VERSION:-0.0.0-dev}"
-APP_BUILD="${CCBAR_BUILD:-1}"
+
+# CFBundleVersion is what Sparkle ACTUALLY compares (sparkle:version in the
+# appcast must match it). Keep it identical to the marketing version so the
+# feed's "0.1.2" beats an installed "0.1.1". Must be dotted-numeric — strip any
+# "-dev"/"-beta" suffix (e.g. 0.0.0-dev → 0.0.0). A bare build counter ("1")
+# here was the bug: Sparkle read "1" as "1.0.0" > "0.1.1" and reported the
+# installed app as already newest.
+APP_BUILD="${CCBAR_BUILD:-${APP_VERSION%%-*}}"
 
 # Sparkle feed lives on GitHub Pages of this repo. Single source of truth so
 # release.sh can publish here and the running app polls the same URL.
