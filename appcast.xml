@@ -39,6 +39,24 @@ EdDSA 서명 도입, /Applications 설치 지원
 _Auto-update is live — future versions install themselves via Sparkle._]]></description>
       <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.1/CCBar-0.1.1.zip" sparkle:edSignature="4hPZ8JSbvsMNmdjAXNyX5CpCbvDGe5ruGzIz4fIdfaUJKAQqQLwIZgJa7eosuqSSo3teJvwk2TPqXFZWAhqpCg==" length="1973336" type="application/octet-stream" />
     </item>
+    <item>
+      <title>CCBar 0.1.2</title>
+      <sparkle:version>0.1.2</sparkle:version>
+      <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+      <pubDate>2026-05-28T03:22:55Z</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[CCBar 0.1.2
+
+Sparkle 버전 비교 수정 (CFBundleVersion 정합)
+
+### Install
+1. Download `CCBar-0.1.2.zip` below
+2. Unzip → drag `CCBar.app` to `/Applications`
+3. First launch will ask for Accessibility + Apple Events permissions
+
+_Auto-update is live — future versions install themselves via Sparkle._]]></description>
+      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.2/CCBar-0.1.2.zip" sparkle:edSignature="t68WJVMSW4fHdjDJf92T/c3KgIn+Shj1AoZ54du1ZL3AxZ+xqxXm+5AL3d+tF6ES/mxLELIwxUybx3Iaqs4qCg==" length="1973322" type="application/octet-stream" />
+    </item>
 
   </channel>
 </rss>
