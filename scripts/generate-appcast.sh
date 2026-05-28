@@ -55,30 +55,49 @@ HTML
 fi
 
 echo "▸ Querying releases…"
-# Pull every published (non-draft, non-prerelease) release with its zip asset.
-# jq turns it into one Sparkle <item> per release.
-RELEASES_JSON=$(gh api "repos/$OWNER_REPO/releases" --paginate)
+SIGN_TOOL="$PROJECT_ROOT/.build/artifacts/sparkle/Sparkle/bin/sign_update"
+[[ -x "$SIGN_TOOL" ]] || { echo "✘ sign_update not found — run 'swift build' first"; exit 1; }
 
-ITEMS=$(printf '%s' "$RELEASES_JSON" | jq -r '
+# Cache downloaded zips so re-runs don't re-fetch every release.
+CACHE="$PROJECT_ROOT/build/appcast-cache"
+mkdir -p "$CACHE"
+
+# One TSV row per published release with a zip asset, oldest→newest.
+# Release notes are base64'd so embedded newlines/tabs don't break the TSV.
+RELEASES_TSV=$(gh api "repos/$OWNER_REPO/releases" --paginate | jq -r '
     [.[] | select(.draft == false) | {
-        tag: .tag_name,
         version: (.tag_name | ltrimstr("v")),
         title: .name,
-        notes: (.body // ""),
         published: .published_at,
+        notes_b64: ((.body // "") | @base64),
         asset: ([.assets[] | select(.name | endswith(".zip"))] | first)
-    } | select(.asset != null)] | reverse[]   # oldest → newest in feed
-    | "    <item>\n" +
-      "      <title>" + .title + "</title>\n" +
-      "      <sparkle:version>" + .version + "</sparkle:version>\n" +
-      "      <sparkle:shortVersionString>" + .version + "</sparkle:shortVersionString>\n" +
-      "      <pubDate>" + .published + "</pubDate>\n" +
-      "      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>\n" +
-      "      <description><![CDATA[" + .notes + "]]></description>\n" +
-      "      <enclosure url=\"" + .asset.browser_download_url + "\"\n" +
-      "                 length=\"" + (.asset.size | tostring) + "\"\n" +
-      "                 type=\"application/octet-stream\" />\n" +
-      "    </item>"')
+    } | select(.asset != null)] | reverse[]
+    | [.version, .title, .published, .asset.browser_download_url, (.asset.size|tostring), .notes_b64]
+    | @tsv')
+
+# Build the <item> list, signing each zip with our EdDSA key. sign_update
+# emits  sparkle:edSignature="…" length="…"  ready to drop into <enclosure>.
+ITEMS=""
+while IFS=$'\t' read -r version title published url size notes_b64; do
+    [[ -z "$version" ]] && continue
+    zip="$CACHE/$(basename "$url")"
+    if [[ ! -f "$zip" ]]; then
+        echo "  ↓ $(basename "$url")"
+        curl -fsSL -o "$zip" "$url"
+    fi
+    SIG_ATTRS=$("$SIGN_TOOL" "$zip")   # → sparkle:edSignature="…" length="…"
+    notes=$(printf '%s' "$notes_b64" | base64 --decode)
+    ITEMS+="    <item>
+      <title>${title}</title>
+      <sparkle:version>${version}</sparkle:version>
+      <sparkle:shortVersionString>${version}</sparkle:shortVersionString>
+      <pubDate>${published}</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[${notes}]]></description>
+      <enclosure url=\"${url}\" ${SIG_ATTRS} type=\"application/octet-stream\" />
+    </item>
+"
+done <<< "$RELEASES_TSV"
 
 mkdir -p "$(dirname "$APPCAST")"
 {

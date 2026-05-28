@@ -125,15 +125,16 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 
     <!-- Sparkle auto-update.
          - SUFeedURL: appcast.xml hosted on GitHub Pages of this repo.
-           release.sh publishes both new releases and updated appcast entries
-           to the same place.
-         - SUEnableAutomaticChecks: true → quiet daily background check.
-         - No SUPublicEDKey: we ship without EdDSA signing for now; Sparkle
-           verifies download integrity via HTTPS transport from
-           api.github.com / objects.githubusercontent.com only. Add an EdDSA
-           key pair later if needed (Sparkle bin/generate_keys). -->
+         - SUPublicEDKey: EdDSA public key. The matching private key lives in
+           the developer's Keychain (created via Sparkle bin/generate_keys);
+           release.sh signs each zip with it and writes the signature into the
+           appcast. Sparkle 2 REQUIRES this — without it "check for updates"
+           silently no-ops.
+         - SUEnableAutomaticChecks: true → quiet daily background check. -->
     <key>SUFeedURL</key>
     <string>$SUFEED_URL</string>
+    <key>SUPublicEDKey</key>
+    <string>12SM1IUFbluC5I2rjT4FaQn7s3gSgfBSPsU7r1aXJJk=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
 </dict>
@@ -170,6 +171,25 @@ codesign --force --deep --sign - \
     "$APP_DIR" 2>&1 | sed 's/^/  /'
 
 echo "✓ $APP_DIR"
-echo ""
-echo "Launch:    open $APP_DIR"
-echo "Quit any prior copy:  pkill -f $EXE_NAME"
+
+# --install: copy into /Applications and relaunch from there. Required for
+# SMAppService (login item) and Sparkle in-place updates to work — both
+# refuse to operate on an app running from a dev/build directory.
+if [[ "${CCBAR_INSTALL:-}" == "1" || " $* " == *" --install "* ]]; then
+    DEST="/Applications/$APP_NAME.app"
+    echo "▸ Installing to $DEST …"
+    pkill -x "$EXE_NAME" 2>/dev/null || true
+    sleep 1
+    rm -rf "$DEST"
+    # ditto preserves the code signature + extended attributes.
+    ditto "$APP_DIR" "$DEST"
+    echo "  ✓ installed"
+    echo "▸ Launching from /Applications …"
+    open "$DEST"
+    echo "✓ running from $DEST"
+else
+    echo ""
+    echo "Launch (dev):       open $APP_DIR"
+    echo "Install + run:      CCBAR_INSTALL=1 $0 ${1:-}   (→ /Applications, enables login-item + auto-update)"
+    echo "Quit any prior copy:  pkill -f $EXE_NAME"
+fi
