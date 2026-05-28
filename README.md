@@ -4,6 +4,19 @@ macOS 메뉴바 앱. 동시에 돌리는 Claude Code 세션 (iTerm2 / Terminal /
 
 전체 설계: [DESIGN.md](../../Documents/AI/etc/claude-code-menu-bar/DESIGN.md)
 
+## 설치 (사용자)
+
+**최신 버전 다운로드 → [Releases 페이지](https://github.com/FindingDory0-0/CCBar/releases/latest)** 에서 `CCBar-X.Y.Z.zip`.
+
+1. zip 압축 해제 → `CCBar.app` 을 **`/Applications`** 로 드래그
+2. **첫 실행 — Gatekeeper 우회** (ad-hoc 서명 + 미공증이라 필요):
+   - `CCBar.app` **우클릭 → 열기** → 경고창에서 다시 **"열기"**
+   - 또는 터미널: `xattr -dr com.apple.quarantine /Applications/CCBar.app`
+3. 첫 실행 시 macOS 권한 2개 승인: **손쉬운 사용**(다른 Space/모니터 창으로 점프) / **자동화**(iTerm2·Terminal 활성화)
+4. 이후 새 버전은 **Sparkle 이 자동 업데이트** — 메뉴바 ⚙ → "업데이트 확인" 으로 즉시 점검도 가능
+
+> ⚠️ 반드시 `/Applications` 에 두고 실행하세요. `Downloads` 등 다른 폴더에서 실행하면 "Mac 부팅 시 자동 실행"(SMAppService)과 Sparkle 자동 업데이트가 macOS 에 의해 차단됩니다.
+
 ## 빌드 & 실행
 
 ```bash
@@ -11,31 +24,44 @@ swift test                       # core 모듈 단위 테스트
 swift run ccbar-cli list         # 데이터 파이프라인만 CLI 로 확인
 swift run ccbar-cli watch        # 실시간 tail
 
-./scripts/build-app.sh           # CCBar.app 번들 (디버그)
-open build/CCBar.app             # 실행
+./scripts/build-app.sh           # CCBar.app 번들 (디버그, build/ 에서 실행)
+open build/CCBar.app             # 개발용 실행
+
+# /Applications 에 설치하고 거기서 실행 (로그인 자동 실행·자동 업데이트 테스트용)
+CCBAR_INSTALL=1 ./scripts/build-app.sh --release
 ```
 
-## 릴리즈 (개발자 전용)
+## 새 버전 배포 (개발자 전용)
+
+코드 수정 → commit/push 후 **한 줄**:
 
 ```bash
-./scripts/release.sh 0.2.0       # 빌드 → zip → tag → GitHub Release → appcast 갱신
+./scripts/release.sh 0.2.0 "변경 요약(선택)"
 ```
 
-자동화 흐름:
-1. `CCBAR_VERSION` 환경변수로 `build-app.sh --release` 호출, ad-hoc 서명된 `CCBar.app` 생성
+이 한 번이 다음을 전부 수행:
+1. `CCBAR_VERSION` 으로 `build-app.sh --release` 호출 → ad-hoc 서명된 `CCBar.app` (CFBundleVersion = 마케팅 버전)
 2. `ditto -c -k --keepParent --sequesterRsrc` 로 `CCBar-<버전>.zip` 패키징
-3. `v<버전>` 태그 push, `gh release create` 로 GitHub Release 에 zip 첨부
-4. `scripts/generate-appcast.sh` 가 모든 published release 를 읽어 `appcast.xml` 재생성 → `gh-pages` 브랜치에 push
+3. `v<버전>` 태그 push + `gh release create` 로 GitHub Release 에 zip 첨부
+4. `scripts/generate-appcast.sh`: 살아있는 모든 release 의 zip 을 받아 **`sign_update` 로 EdDSA 서명** → `appcast.xml` 재생성 → `gh-pages` 브랜치 push
 
-### 첫 릴리즈 전에 한 번 할 일
-- repo Settings → Pages → Source: `gh-pages` 브랜치 / `/ (root)` 활성화
-- `gh auth login` (gh CLI 인증)
-- `gh-pages` 브랜치는 `generate-appcast.sh` 가 첫 실행 시 자동 생성
+배포 후 기존 사용자는 Sparkle 이 자동으로 새 버전을 받습니다. (직접 시연하려면 낮은 버전을 설치 후 ⚙ → "업데이트 확인": `CCBAR_VERSION=0.1.0 CCBAR_INSTALL=1 ./scripts/build-app.sh --release`)
 
-### 사용자 측 자동 업데이트
-`SUFeedURL = https://findingdory0-0.github.io/CCBar/appcast.xml`. Sparkle 이 일 1회 백그라운드 점검 + ⚙ → "업데이트 확인" 으로 수동 점검. 새 버전 발견 시 zip 다운로드 → 자동 설치 → 재시작.
+### 옛 release 정리
 
-EdDSA 서명은 현재 미적용. HTTPS transport (`api.github.com` / `objects.githubusercontent.com`) 가 무결성 보장. 필요해지면 `.build/artifacts/sparkle/Sparkle/bin/generate_keys` 로 도입 가능.
+```bash
+gh release delete v0.1.0 --yes --cleanup-tag --repo FindingDory0-0/CCBar
+./scripts/generate-appcast.sh    # 삭제 후 반드시 — appcast 의 죽은 링크 제거
+```
+
+> appcast.xml 은 gh-pages 의 정적 파일이라 release 만 지우면 자동 갱신 안 됨. `generate-appcast.sh` 를 꼭 다시 돌려야 0.1.x 죽은 enclosure 가 사라집니다.
+
+### 인프라 (한 번 셋업 완료)
+- **appcast 호스팅**: `https://findingdory0-0.github.io/CCBar/appcast.xml` (gh-pages 브랜치, GitHub Pages). repo Settings → Pages 는 활성화 완료.
+- **EdDSA 서명**: private 키가 **개발자 Mac Keychain** 에 있음 (`generate_keys` 생성). public 키는 `build-app.sh` 의 `SUPublicEDKey`. ⚠️ private 키 분실 시 자동 업데이트 체인이 끊김 — 사용자가 새 키로 서명된 버전을 수동 재설치해야 함.
+- `gh auth login` 필요 (release.sh 가 `gh` CLI 사용).
+
+> **버전 정합 주의**: Sparkle 은 마케팅 버전이 아니라 `CFBundleVersion` 으로 비교한다. `build-app.sh` 가 `CFBundleVersion = CCBAR_VERSION` 으로 맞춰두므로 appcast 의 `sparkle:version` 과 일치. 빌드 카운터/타임스탬프를 쓰면 비교가 꼬여 "이미 최신" 오판이 난다.
 
 ## 레이아웃
 
@@ -62,7 +88,8 @@ scripts/
 - [x] **M5.B** — 세션 검색 (별명 / cwd / 마지막 메시지)
 - [x] **M6.A** — 로그인 시 자동 실행 (SMAppService)
 - [x] **M6.B** — 앱 이름 / 아이콘 확정
-- [x] **M6.C** — Sparkle 자동 업데이트
+- [x] **M6.C** — Sparkle 자동 업데이트 (EdDSA 서명, GitHub Pages appcast, 0.1.1→0.1.2 end-to-end 검증)
+- [x] **배포 자동화** — `release.sh` 한 줄로 빌드→서명→GitHub Release→appcast 갱신
 - [x] **권한 영속성** — ad-hoc 서명 + identifier-pinned designated requirement로 재빌드 시에도 TCC (Accessibility / Apple Events) 권한 유지
 
 ## 안 들어간 것
