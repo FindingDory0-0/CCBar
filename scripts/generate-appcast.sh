@@ -25,7 +25,10 @@ gh auth status >/dev/null 2>&1 || { echo "✘ gh not authenticated"; exit 1; }
 # .build …` directly in the main working tree, which deleted the user's
 # uncommitted build artifacts. Worktree isolation makes that impossible —
 # `git rm -rf .` only ever touches the throwaway worktree directory.
+# Drop any stale worktree (dir removed but still registered) before re-adding.
+git worktree remove --force "$WORKTREE" 2>/dev/null || true
 rm -rf "$WORKTREE"
+git worktree prune
 if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
     git worktree add "$WORKTREE" gh-pages
     git -C "$WORKTREE" fetch origin gh-pages
