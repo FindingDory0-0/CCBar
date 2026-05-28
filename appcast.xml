@@ -6,40 +6,6 @@
     <description>Auto-update feed for CCBar — Claude Code menu bar app.</description>
     <language>en</language>
     <item>
-      <title>CCBar 0.1.0</title>
-      <sparkle:version>0.1.0</sparkle:version>
-      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
-      <pubDate>2026-05-27T23:56:33Z</pubDate>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[CCBar 0.1.0
-
-### Install
-1. Download `CCBar-0.1.0.zip` below
-2. Unzip → drag `CCBar.app` to `/Applications`
-3. First launch will ask for Accessibility + Apple Events permissions
-
-_Auto-update is live — future versions install themselves via Sparkle._]]></description>
-      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.0/CCBar-0.1.0.zip" sparkle:edSignature="D0Qtfd+iTsc4ZuVQA2tTzyIrx/3BO9mp10J8i4MPjROC8BvGBxMeov9lX6WJPT3+hpunIrHdxHzC7Kx1z6V3BQ==" length="1973315" type="application/octet-stream" />
-    </item>
-    <item>
-      <title>CCBar 0.1.1</title>
-      <sparkle:version>0.1.1</sparkle:version>
-      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
-      <pubDate>2026-05-28T03:13:48Z</pubDate>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[CCBar 0.1.1
-
-EdDSA 서명 도입, /Applications 설치 지원
-
-### Install
-1. Download `CCBar-0.1.1.zip` below
-2. Unzip → drag `CCBar.app` to `/Applications`
-3. First launch will ask for Accessibility + Apple Events permissions
-
-_Auto-update is live — future versions install themselves via Sparkle._]]></description>
-      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.1/CCBar-0.1.1.zip" sparkle:edSignature="4hPZ8JSbvsMNmdjAXNyX5CpCbvDGe5ruGzIz4fIdfaUJKAQqQLwIZgJa7eosuqSSo3teJvwk2TPqXFZWAhqpCg==" length="1973336" type="application/octet-stream" />
-    </item>
-    <item>
       <title>CCBar 0.1.2</title>
       <sparkle:version>0.1.2</sparkle:version>
       <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
