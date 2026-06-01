@@ -23,6 +23,24 @@ Sparkle 버전 비교 수정 (CFBundleVersion 정합)
 _Auto-update is live — future versions install themselves via Sparkle._]]></description>
       <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.2/CCBar-0.1.2.zip" sparkle:edSignature="t68WJVMSW4fHdjDJf92T/c3KgIn+Shj1AoZ54du1ZL3AxZ+xqxXm+5AL3d+tF6ES/mxLELIwxUybx3Iaqs4qCg==" length="1973322" type="application/octet-stream" />
     </item>
+    <item>
+      <title>CCBar 0.1.3</title>
+      <sparkle:version>0.1.3</sparkle:version>
+      <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+      <pubDate>2026-06-01T02:02:57Z</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[CCBar 0.1.3
+
+서명팝업 반복 노출 수정
+
+### Install
+1. Download `CCBar-0.1.3.zip` below
+2. Unzip → drag `CCBar.app` to `/Applications`
+3. First launch will ask for Accessibility + Apple Events permissions
+
+_Auto-update is live — future versions install themselves via Sparkle._]]></description>
+      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.3/CCBar-0.1.3.zip" sparkle:edSignature="B7smbU4VE4r8UOK9icXzPxpv2t2z5T1FnU1vC1KkDGSU6vEDzmFK9rI8fwm+eZVWkNqs74bU9NLAdz8BpjDvDw==" length="1988130" type="application/octet-stream" />
+    </item>
 
   </channel>
 </rss>
