@@ -13,7 +13,8 @@
 #
 # What it does:
 #   1) Validates version, working tree, gh auth.
-#   2) Builds CCBar.app at the requested version (release config, ad-hoc signed).
+#   2) Builds CCBar.app at the requested version (release config, signed with
+#      the self-signed "CCBar Code Signing" identity; ad-hoc fallback if absent).
 #   3) Zips the .app → CCBar-<version>.zip.
 #   4) Creates an annotated git tag `v<version>` and pushes it.
 #   5) Creates a GitHub Release with the zip attached.

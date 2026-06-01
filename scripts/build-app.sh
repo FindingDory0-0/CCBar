@@ -152,30 +152,51 @@ cat > "$APP_DIR/Contents/PkgInfo" <<EOF
 APPL????
 EOF
 
-# Ad-hoc codesign with bundle identifier pinned and an explicit
-# designated requirement (`-r=`). The requirement is a one-liner; codesign's
-# Requirement Language doesn't want a leading `=` here.
+# Codesigning. We prefer a dedicated *self-signed* code-signing identity
+# ("CCBar Code Signing", created by scripts/make-signing-cert.sh) over ad-hoc.
 #
-# Goal: get TCC to key permissions on our bundle id, not the cdhash.
-# Default ad-hoc DR includes the cdhash → every rebuild = new TCC entity =
-# user has to re-grant Accessibility / Automation. Pinning the DR to
-# "identifier com.ccbar.menubar" *should* let new builds inherit grants
-# while the bundle id is unchanged (caveat: macOS TCC also looks at cdhash
-# stability — Apple's own docs are vague on which wins).
+# Why it matters: CCBar reads Claude Code's `Claude Code-credentials` keychain
+# item, guarded by an ACL. With ad-hoc signing the keychain refuses to anchor
+# an "Always Allow" grant to the (forgeable) bundle id and pins the cdhash
+# instead, so every rebuild / Sparkle update re-prompts. A real cert gives
+# codesign a stable DR —
+#     identifier "com.ccbar.menubar" and certificate root = H"<cert>"
+# — which the keychain (and TCC) keep across rebuilds that reuse the cert.
+# So: with a cert we let codesign emit that natural cert-anchored DR and do
+# NOT override it. Without one we fall back to ad-hoc + the old identifier-
+# pinned DR (keeps TCC grants across rebuilds; keychain will still re-prompt).
 #
 # Frameworks must be signed first; --deep handles that. We also force-sign
 # the executable to ensure --identifier overrides SwiftPM's auto-generated
 # id (`ccbar-app-<hash>`) which is otherwise sticky.
-echo "▸ Codesigning (ad-hoc, identifier-pinned requirement) …"
-REQ_FILE="$PROJECT_ROOT/build/.codesign-requirement"
-cat > "$REQ_FILE" <<REQ
+SIGN_ID="${CCBAR_SIGN_IDENTITY:-}"
+if [[ -z "$SIGN_ID" ]]; then
+    # Resolve the cert's SHA-1 by name (machine-specific hash, so look it up
+    # rather than hardcode). Empty if the identity isn't installed.
+    SIGN_ID=$(security find-identity -p codesigning 2>/dev/null \
+              | awk '/"CCBar Code Signing"/ {print $2; exit}')
+fi
+
+codesign --remove-signature "$APP_DIR/Contents/MacOS/$EXE_NAME" 2>/dev/null || true
+if [[ -n "$SIGN_ID" ]]; then
+    echo "▸ Codesigning with CCBar identity ($SIGN_ID) — cert-anchored DR …"
+    codesign --force --deep --sign "$SIGN_ID" \
+        --identifier "$BUNDLE_ID" \
+        "$APP_DIR" 2>&1 | sed 's/^/  /'
+else
+    echo "▸ Codesigning (ad-hoc fallback, identifier-pinned requirement) …"
+    echo "  ⚠ no 'CCBar Code Signing' identity found — the keychain access"
+    echo "    prompt will recur on every rebuild. Run scripts/make-signing-cert.sh"
+    echo "    once to fix it permanently."
+    REQ_FILE="$PROJECT_ROOT/build/.codesign-requirement"
+    cat > "$REQ_FILE" <<REQ
 designated => identifier "$BUNDLE_ID"
 REQ
-codesign --remove-signature "$APP_DIR/Contents/MacOS/$EXE_NAME" 2>/dev/null || true
-codesign --force --deep --sign - \
-    --identifier "$BUNDLE_ID" \
-    --requirements "$REQ_FILE" \
-    "$APP_DIR" 2>&1 | sed 's/^/  /'
+    codesign --force --deep --sign - \
+        --identifier "$BUNDLE_ID" \
+        --requirements "$REQ_FILE" \
+        "$APP_DIR" 2>&1 | sed 's/^/  /'
+fi
 
 echo "✓ $APP_DIR"
 
