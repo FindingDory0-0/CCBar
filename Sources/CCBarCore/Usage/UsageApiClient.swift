@@ -7,14 +7,25 @@ import Security
 /// Trigger model: caller invokes `fetch()` when the popover opens. No background
 /// polling. A 30-second in-memory cache absorbs rapid re-opens.
 ///
-/// Auth flow:
+/// Auth flow (READ-ONLY on the Keychain — see below):
 ///   1. Read `Claude Code-credentials` from macOS Keychain → JSON with
 ///      `claudeAiOauth.{accessToken, refreshToken, expiresAt, …}`.
-///   2. If `expiresAt - now < 60s` → refresh via `platform.claude.com/v1/oauth/token`
-///      using the refresh token and Claude Code's public OAuth client ID. Write the
-///      new token back into Keychain so Claude Code itself sees it too.
-///   3. GET `api.anthropic.com/api/oauth/usage` with `Bearer <accessToken>` and the
+///   2. GET `api.anthropic.com/api/oauth/usage` with `Bearer <accessToken>` and the
 ///      `anthropic-beta: oauth-2025-04-20` header. Decode the response.
+///
+/// We deliberately do NOT refresh the token or write anything back to the
+/// Keychain. Two reasons:
+///   • The Keychain item belongs to Claude Code. Reading it is one ACL grant
+///     ("Always Allow" on decrypt); *modifying* it is a SEPARATE authorization
+///     that re-prompts on every write — which is exactly the recurring
+///     "키 접근 허용" popup users hit. A pure reader needs the grant once.
+///   • Claude Code rotates its own refresh token. If we refreshed and wrote a
+///     rotated token back, a race with Claude Code's own refresh could
+///     invalidate its copy and log the user out. Not our job.
+/// Claude Code keeps the access token fresh during normal use, so reading the
+/// current value is enough. If it happens to be expired (Claude idle), the
+/// usage call 401s and we keep showing the last cached numbers until Claude
+/// Code refreshes on its next use.
 ///
 /// Implementation closely follows the open-source OMC plugin
 /// (`src/hud/usage-api.ts` v4.13.7), which proved the protocol in practice.
@@ -22,14 +33,10 @@ public actor UsageApiClient {
 
     // MARK: - Configuration
 
-    /// OAuth client ID for Claude Code (public, hard-coded into the CLI binary).
-    private let oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     /// Beta header required by the usage endpoint.
     private let betaHeader = "oauth-2025-04-20"
     /// Cache time-to-live for successful responses.
     private let cacheTTL: TimeInterval = 30
-    /// Refresh tokens that are within this window of expiry before calling.
-    private let refreshLeeway: TimeInterval = 60
     /// Exponential backoff caps for 429 responses (matches OMC's pattern).
     private let initialBackoff: TimeInterval = 15
     private let maxBackoff: TimeInterval = 300
@@ -117,17 +124,10 @@ public actor UsageApiClient {
             return .failure(.keychainUnavailable)
         }
 
-        // 2. Refresh if near expiry
-        let token: String
-        if creds.isExpiringSoon(leeway: refreshLeeway) {
-            do {
-                token = try await refresh(creds: creds)
-            } catch {
-                return .failure(.tokenRefreshFailed)
-            }
-        } else {
-            token = creds.accessToken
-        }
+        // 2. Use the stored access token as-is. We never refresh or write back
+        //    (read-only on Claude Code's Keychain item — see the type doc).
+        //    If it's expired, the call below 401s and we fall back to cache.
+        let token = creds.accessToken
 
         // 3. Fetch usage
         do {
@@ -158,15 +158,6 @@ public actor UsageApiClient {
 
     private struct Credentials: Sendable {
         var accessToken: String
-        var refreshToken: String?
-        /// Milliseconds since epoch (Claude Code's storage convention).
-        var expiresAtMs: Double?
-
-        func isExpiringSoon(leeway: TimeInterval) -> Bool {
-            guard let ms = expiresAtMs else { return false }
-            let expiry = Date(timeIntervalSince1970: ms / 1000)
-            return expiry.timeIntervalSinceNow < leeway
-        }
     }
 
     /// Reads the `Claude Code-credentials` keychain entry and decodes the wrapped
@@ -190,79 +181,7 @@ public actor UsageApiClient {
         else {
             throw Failure.credentialsMalformed
         }
-        return Credentials(
-            accessToken: access,
-            refreshToken: inner["refreshToken"] as? String,
-            expiresAtMs: (inner["expiresAt"] as? Double)
-                ?? (inner["expiresAt"] as? Int).map(Double.init)
-        )
-    }
-
-    // MARK: - Token refresh
-
-    /// POST `platform.claude.com/v1/oauth/token` with grant_type=refresh_token.
-    /// On success, returns the new access token (and quietly persists it back to Keychain).
-    private func refresh(creds: Credentials) async throws -> String {
-        guard let refreshToken = creds.refreshToken else {
-            throw Failure.tokenRefreshFailed
-        }
-        var req = URLRequest(url: URL(string: "https://platform.claude.com/v1/oauth/token")!)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: String] = [
-            "grant_type": "refresh_token",
-            "refresh_token": refreshToken,
-            "client_id": oauthClientID,
-        ]
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await urlSession.data(for: req)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw Failure.tokenRefreshFailed
-        }
-        guard
-            let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let newAccess = obj["access_token"] as? String
-        else { throw Failure.tokenRefreshFailed }
-
-        // Best-effort write-back so Claude Code (and we) reuse the fresh token.
-        let newRefresh = (obj["refresh_token"] as? String) ?? refreshToken
-        let expiresIn = (obj["expires_in"] as? Double) ?? (obj["expires_in"] as? Int).map(Double.init) ?? 0
-        let newExpiresAtMs = (Date().timeIntervalSince1970 + expiresIn) * 1000
-        try? writeBackCredentials(access: newAccess, refresh: newRefresh, expiresAtMs: newExpiresAtMs)
-
-        return newAccess
-    }
-
-    /// Updates the Keychain item in place. Failure is non-fatal — we'll just
-    /// refresh again next time.
-    private func writeBackCredentials(access: String, refresh: String, expiresAtMs: Double) throws {
-        // Read current outer JSON so we don't lose unknown fields.
-        let query: [String: Any] = [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-            kSecReturnData as String:  true,
-            kSecMatchLimit as String:  kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data,
-              var outer = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              var inner = outer["claudeAiOauth"] as? [String: Any]
-        else { return }
-
-        inner["accessToken"] = access
-        inner["refreshToken"] = refresh
-        inner["expiresAt"] = expiresAtMs
-        outer["claudeAiOauth"] = inner
-        let newData = try JSONSerialization.data(withJSONObject: outer, options: [])
-
-        let updateQuery: [String: Any] = [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-        ]
-        let attrs: [String: Any] = [kSecValueData as String: newData]
-        _ = SecItemUpdate(updateQuery as CFDictionary, attrs as CFDictionary)
+        return Credentials(accessToken: access)
     }
 
     // MARK: - Usage endpoint

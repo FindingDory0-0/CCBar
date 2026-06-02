@@ -164,21 +164,23 @@ final class ToastWindowController {
     /// horizontally around.
     ///
     /// Priority:
-    ///   1. Screen containing the mouse cursor (where the user is actually looking).
-    ///   2. If that screen has its own menu bar with our status item, anchor under
-    ///      the icon. Otherwise, fall back to that screen's right edge.
-    ///   3. If even the mouse screen can't be determined, fall back to the
-    ///      original status-item screen, then to `NSScreen.main`.
+    ///   1. The *active* screen — `NSScreen.main`, the display holding the
+    ///      focused (key) window, i.e. the monitor the user is working on. Our
+    ///      toast panel is non-activating (see `makePanel`), so showing it never
+    ///      steals focus and `NSScreen.main` keeps pointing at the user's app
+    ///      rather than the toast. (Previously we used the mouse-cursor screen.)
+    ///   2. If that screen's menu bar hosts our status item, anchor under the
+    ///      icon. Otherwise fall back to that screen's right edge.
+    ///   3. If `NSScreen.main` is somehow nil, fall back to any screen hosting
+    ///      our status item, then to the first screen.
     private func iconScreenAndCenterX() -> (NSScreen, CGFloat) {
-        let mouseLocation = NSEvent.mouseLocation
-
-        // Find the screen the cursor is currently on.
-        if let mouseScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
-            if let iconX = iconCenterX(on: mouseScreen) {
-                return (mouseScreen, iconX)
+        // The display with keyboard focus = where the user is actively looking.
+        if let activeScreen = NSScreen.main {
+            if let iconX = iconCenterX(on: activeScreen) {
+                return (activeScreen, iconX)
             }
-            // Mouse screen has no menu bar (single-menubar mode) — right-align there.
-            return (mouseScreen, mouseScreen.visibleFrame.maxX - 200)
+            // Active screen has no menu bar with our icon — right-align there.
+            return (activeScreen, activeScreen.visibleFrame.maxX - 200)
         }
 
         // Fallback: any screen hosting our status item.
@@ -187,7 +189,7 @@ final class ToastWindowController {
                 return (screen, iconX)
             }
         }
-        let fallback = NSScreen.main ?? NSScreen.screens.first!
+        let fallback = NSScreen.screens.first!
         return (fallback, fallback.visibleFrame.maxX - 200)
     }
 
