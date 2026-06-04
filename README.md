@@ -11,8 +11,8 @@ macOS 메뉴바 앱. 동시에 돌리는 Claude Code 세션 (iTerm2 / Terminal /
    - `CCBar.app` **우클릭 → 열기** → 경고창에서 다시 **"열기"**
    - 또는 터미널: `xattr -dr com.apple.quarantine /Applications/CCBar.app`
 3. 첫 실행 시 macOS 권한 2개 승인: **손쉬운 사용**(다른 Space/모니터 창으로 점프) / **자동화**(iTerm2·Terminal 활성화)
-4. **키체인 접근 허용** — 사용량(5h/7d) 바는 Claude Code 의 `Claude Code-credentials` 키체인 항목을 읽어 그립니다. 첫 실행 때 "CCBar이(가) 'Claude Code-credentials' 키 접근을 허용하고자 합니다" 창이 뜨면 **암호 입력 + "항상 허용"**. 한 번이면 됩니다.
-   - 드물게 이 창이 **반복**되면(앱이 Apple 공증 신원이 아니라 생길 수 있음): **키체인 접근.app** → `Claude Code-credentials` 더블클릭 → **접근 제어** 탭 → **"모든 응용 프로그램이 이 항목에 접근하도록 허용"** → 변경 저장. 그러면 더 묻지 않습니다.
+4. **키체인 접근 허용** — 사용량(5h/7d) 바는 Claude Code 의 `Claude Code-credentials` 키체인 항목을 읽어 그립니다. 첫 실행 때 "CCBar이(가) 'Claude Code-credentials' 키 접근을 허용하고자 합니다" 창이 뜨면 **암호 입력 + "항상 허용"**.
+   - ⚠️ 이 창이 **계속 반복**되면(공증 안 된 앱은 "항상 허용" 이 버전마다 안 박힘): 메뉴바 CCBar **⚙ → "사용량 키체인 접근 허용"** 을 한 번 누르세요. 암호 1회 입력하면 그 뒤로는 업데이트가 돼도 다시 안 뜹니다. (수동으로 하려면: **키체인 접근.app** → `Claude Code-credentials` 더블클릭 → **접근 제어** 탭 → **"모든 응용 프로그램이 이 항목에 접근하도록 허용"** → 변경 저장.)
 5. 이후 새 버전은 **Sparkle 이 자동 업데이트** — 메뉴바 ⚙ → "업데이트 확인" 으로 즉시 점검도 가능
 
 > ⚠️ 반드시 `/Applications` 에 두고 실행하세요. `Downloads` 등 다른 폴더에서 실행하면 "Mac 부팅 시 자동 실행"(SMAppService)과 Sparkle 자동 업데이트가 macOS 에 의해 차단됩니다.

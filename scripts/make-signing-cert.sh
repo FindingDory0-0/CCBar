@@ -3,35 +3,21 @@
 # *code-signing* identity for CCBar, import it into the login keychain, AND
 # mark it trusted for code signing.
 #
-# WHY this exists (the recurring "키 접근 허용" keychain popup):
-#   CCBar reads Claude Code's `Claude Code-credentials` keychain item to draw
-#   the usage bars. macOS guards that item with an ACL. When you click
-#   "항상 허용", the system records the requesting app's code requirement.
+# WHAT this is for: keeping **TCC** grants (손쉬운 사용 / 자동화) across rebuilds.
+#   codesign's designated requirement becomes
+#       identifier "com.ccbar.menubar" and certificate root = H"<cert>"
+#   which has no cdhash term, so TCC permissions survive every rebuild that
+#   reuses this cert (ad-hoc, by contrast, re-pins the cdhash each build → TCC
+#   re-prompts). We do NOT reuse a corporate Developer ID — distributed GitHub
+#   builds shouldn't carry someone else's identity.
 #
-#   • ad-hoc signing has no signing authority and a bare
-#     `identifier "com.ccbar.menubar"` requirement is forgeable, so the keychain
-#     pins the **cdhash** → every rebuild/Sparkle update re-prompts.
-#   • A self-signed cert gives codesign a stable designated requirement
-#     (`identifier "com.ccbar.menubar" and certificate root = H"<cert>"`), BUT
-#     that alone is NOT enough: if the cert is **untrusted**, the keychain still
-#     won't honour an "Always Allow" anchored to it across builds. The grant
-#     only sticks once the cert is **trusted for code signing** (this script's
-#     `add-trusted-cert` step). That was the missing piece behind the popup that
-#     kept coming back even after switching to a cert.
-#
-#   We deliberately do NOT reuse any Developer ID already in the keychain (e.g.
-#   a corporate cert) — distributed GitHub builds shouldn't carry someone
-#   else's identity.
-#
-# SCOPE — this only fixes the *developer's* machine. The trust setting is local;
-#   it does NOT ship to end users (their Macs don't trust this self-signed cert
-#   and we can't ask them to run commands). For end users the app is "validly
-#   signed by an untrusted authority", so they get the keychain prompt once on
-#   first launch; on their fixed (never-rebuilt) install the grant generally
-#   sticks after one "Always Allow". If it keeps recurring for them, the README
-#   documents the Keychain Access → "Allow all applications" fallback. The only
-#   fully seamless option for everyone is Apple Developer ID + notarization,
-#   which needs paid Apple Developer Program enrollment (not in use here).
+# WHAT this is NOT for: the recurring usage-bar "키 접근 허용" keychain popup.
+#   That is an *item-ACL* problem, NOT a signing problem (the keychain pins
+#   trusted apps by changing identity, unrelated to cert trust). Fix it with the
+#   app's ⚙ → "사용량 키체인 접근 허용" button (Sources/CCBarCore/Usage/
+#   KeychainAccessGrant.swift), or Keychain Access → "Allow all applications".
+#   See CLAUDE.md trap #7. (Earlier versions of this header wrongly claimed the
+#   trusted cert fixed the keychain popup — it doesn't.)
 #
 # Idempotent: re-running detects an existing/trusted cert and skips that step.
 
