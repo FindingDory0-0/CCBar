@@ -2,8 +2,6 @@
 
 macOS 메뉴바 앱. 동시에 돌리는 Claude Code 세션 (iTerm2 / Terminal / VS Code 계열 / JetBrains)들을 한 곳에서 보고, 호스트 창으로 점프하고, 응답·승인 알림을 토스트로 받는다.
 
-전체 설계: [DESIGN.md](../../Documents/AI/etc/claude-code-menu-bar/DESIGN.md)
-
 ## 설치 (사용자)
 
 **최신 버전 다운로드 → [Releases 페이지](https://github.com/FindingDory0-0/CCBar/releases/latest)** 에서 `CCBar-X.Y.Z.zip`.
@@ -20,6 +18,14 @@ macOS 메뉴바 앱. 동시에 돌리는 Claude Code 세션 (iTerm2 / Terminal /
 > ⚠️ 반드시 `/Applications` 에 두고 실행하세요. `Downloads` 등 다른 폴더에서 실행하면 "Mac 부팅 시 자동 실행"(SMAppService)과 Sparkle 자동 업데이트가 macOS 에 의해 차단됩니다.
 
 ## 빌드 & 실행
+
+**새 개발 머신이라면 최초 1회** 코드사이닝 인증서 셋업 (자세한 이유는 아래 "인프라" 와 `CLAUDE.md` 함정 #4):
+
+```bash
+./scripts/make-signing-cert.sh   # 자체서명 코드사이닝 cert 생성 → login 키체인 import → 신뢰 등록 (멱등)
+```
+
+이후:
 
 ```bash
 swift test                       # core 모듈 단위 테스트
@@ -42,7 +48,7 @@ CCBAR_INSTALL=1 ./scripts/build-app.sh --release
 ```
 
 이 한 번이 다음을 전부 수행:
-1. `CCBAR_VERSION` 으로 `build-app.sh --release` 호출 → ad-hoc 서명된 `CCBar.app` (CFBundleVersion = 마케팅 버전)
+1. `CCBAR_VERSION` 으로 `build-app.sh --release` 호출 → 자체서명 cert 로 서명된 `CCBar.app` (CFBundleVersion = 마케팅 버전)
 2. `ditto -c -k --keepParent --sequesterRsrc` 로 `CCBar-<버전>.zip` 패키징
 3. `v<버전>` 태그 push + `gh release create` 로 GitHub Release 에 zip 첨부
 4. `scripts/generate-appcast.sh`: 살아있는 모든 release 의 zip 을 받아 **`sign_update` 로 EdDSA 서명** → `appcast.xml` 재생성 → `gh-pages` 브랜치 push
@@ -59,6 +65,7 @@ gh release delete v0.1.0 --yes --cleanup-tag --repo FindingDory0-0/CCBar
 > appcast.xml 은 gh-pages 의 정적 파일이라 release 만 지우면 자동 갱신 안 됨. `generate-appcast.sh` 를 꼭 다시 돌려야 0.1.x 죽은 enclosure 가 사라집니다.
 
 ### 인프라 (한 번 셋업 완료)
+- **코드사이닝 인증서 (자체서명)**: `./scripts/make-signing-cert.sh` 가 `CCBar Code Signing` 자체서명 cert 를 만들어 login 키체인에 넣고 코드사이닝 신뢰까지 등록한다(멱등 — 재실행 시 skip). `build-app.sh` 가 이 cert 를 자동 감지해 서명하고, 없으면 ad-hoc 으로 fallback. **왜 필요한가**: usage 바가 Claude Code 의 `Claude Code-credentials` 키체인 항목을 읽는데, ad-hoc/미신뢰 서명이면 macOS "키 접근 허용" 팝업이 재빌드마다 재발한다. 신뢰된 cert 로 서명하면 grant 가 박혀 안 뜬다(개발 머신 한정 — 배포본 사용자는 README 상단 설치 4번 참고). cert/키 백업은 `~/.ccbar/signing/`.
 - **appcast 호스팅**: `https://findingdory0-0.github.io/CCBar/appcast.xml` (gh-pages 브랜치, GitHub Pages). repo Settings → Pages 는 활성화 완료.
 - **EdDSA 서명**: private 키가 **개발자 Mac Keychain** 에 있음 (`generate_keys` 생성). public 키는 `build-app.sh` 의 `SUPublicEDKey`. ⚠️ private 키 분실 시 자동 업데이트 체인이 끊김 — 사용자가 새 키로 서명된 버전을 수동 재설치해야 함.
 - `gh auth login` 필요 (release.sh 가 `gh` CLI 사용).
@@ -76,8 +83,9 @@ Sources/
 Tests/
   CCBarCoreTests/
 scripts/
-  build-app.sh    # SPM 빌드 → .app 번들링 → Sparkle 임베드 → ad-hoc 서명
-  make-icon.swift # AppIcon 생성 (SwiftUI ImageRenderer)
+  build-app.sh        # SPM 빌드 → .app 번들링 → Sparkle 임베드 → 자체서명 cert 서명 (없으면 ad-hoc)
+  make-signing-cert.sh # 자체서명 코드사이닝 cert 생성·import·신뢰 등록 (개발 머신 최초 1회)
+  make-icon.swift     # AppIcon 생성 (SwiftUI ImageRenderer)
 ```
 
 ## 진행 상황
@@ -92,12 +100,12 @@ scripts/
 - [x] **M6.B** — 앱 이름 / 아이콘 확정
 - [x] **M6.C** — Sparkle 자동 업데이트 (EdDSA 서명, GitHub Pages appcast, 0.1.1→0.1.2 end-to-end 검증)
 - [x] **배포 자동화** — `release.sh` 한 줄로 빌드→서명→GitHub Release→appcast 갱신
-- [x] **권한 영속성** — ad-hoc 서명 + identifier-pinned designated requirement로 재빌드 시에도 TCC (Accessibility / Apple Events) 권한 유지
+- [x] **권한 영속성** — 자체서명 cert + 코드사이닝 신뢰 등록으로 재빌드 시에도 TCC (Accessibility / Apple Events) · 키체인 권한 유지
 
 ## 안 들어간 것
 
 - 프롬프트 템플릿, 비용(USD) 누적 표시 — 사용자가 필요 없다고 결정 (사용량 % 만으로 충분)
-- 정식 Apple Developer Program 서명·공증 — ad-hoc 으로 충분, GitHub 배포 전제
+- 정식 Apple Developer Program 서명·공증 — 미가입(유료). 자체서명 cert + GitHub 배포로 운영(첫 실행 시 Gatekeeper 우회·키체인 허용 1회 필요)
 
 ## 알아둘 점
 
