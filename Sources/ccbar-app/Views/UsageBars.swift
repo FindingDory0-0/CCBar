@@ -20,6 +20,11 @@ struct UsageBars: View {
                 if let sonnet = usage.sevenDaySonnet {
                     bar(label: "Sonnet", window: sonnet, sub: true)
                 }
+                // Per-model weekly caps from the API's `limits` array (e.g. Fable).
+                // Same full-size style as 5h/7d (not the thinner sub-bar).
+                ForEach(usage.scopedModels ?? [], id: \.modelName) { m in
+                    bar(label: m.modelName, window: m.window)
+                }
                 // If a fetch failed since the snapshot was taken, fold in a tiny notice.
                 if let err = appModel.usageError {
                     inlineErrorBadge(err, fetchedAt: usage.fetchedAt)

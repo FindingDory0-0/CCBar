@@ -37,6 +37,8 @@ public actor UsageApiClient {
     private let betaHeader = "oauth-2025-04-20"
     /// Cache time-to-live for successful responses.
     private let cacheTTL: TimeInterval = 30
+    /// Re-read the keychain this long before the cached access token expires.
+    private let tokenLeeway: TimeInterval = 300
     /// Exponential backoff caps for 429 responses (matches OMC's pattern).
     private let initialBackoff: TimeInterval = 15
     private let maxBackoff: TimeInterval = 300
@@ -75,6 +77,10 @@ public actor UsageApiClient {
     }
 
     private var cachedUsage: SubscriptionUsage?
+    /// In-memory access token cache. Reusing it lets us skip the keychain read
+    /// (and thus the "키 접근 허용" prompt) on most fetches — we only touch the
+    /// keychain once per token lifetime (~hours) instead of every fetch.
+    private var cachedToken: (token: String, expiresAt: Date)?
     /// Consecutive 429 count; resets on the next successful fetch.
     private var rateLimitStreak: Int = 0
     /// Absolute time until which we shouldn't even try to call again.
@@ -114,30 +120,38 @@ public actor UsageApiClient {
             return .failure(.http(429))
         }
 
-        // 1. Credentials
-        let creds: Credentials
-        do {
-            creds = try loadCredentials()
-        } catch let f as Failure {
-            return .failure(f)
-        } catch {
-            return .failure(.keychainUnavailable)
+        // 1-2. Access token. Reuse the in-memory cache while it's valid so we
+        //       DON'T read the keychain (→ no "키 접근 허용" prompt) on every
+        //       fetch — only ~once per token lifetime. Usage still updates live.
+        let token: String
+        let usedCachedToken: Bool
+        if let ct = cachedToken, ct.expiresAt.timeIntervalSinceNow > tokenLeeway {
+            token = ct.token
+            usedCachedToken = true
+        } else {
+            do {
+                token = try readTokenFromKeychainAndCache()
+                usedCachedToken = false
+            } catch let f as Failure {
+                return .failure(f)
+            } catch {
+                return .failure(.keychainUnavailable)
+            }
         }
-
-        // 2. Use the stored access token as-is. We never refresh or write back
-        //    (read-only on Claude Code's Keychain item — see the type doc).
-        //    If it's expired, the call below 401s and we fall back to cache.
-        let token = creds.accessToken
 
         // 3. Fetch usage
         do {
-            var usage = try await callUsage(token: token)
-            usage.fetchedAt = Date()
-            cachedUsage = usage
-            saveDiskCache(usage)
-            rateLimitStreak = 0
-            rateLimitedUntil = nil
-            return .success(usage)
+            return try await fetchUsage(token: token)
+        } catch Failure.http(401) where usedCachedToken {
+            // A cached token got rejected (rotated/revoked early). Drop it and
+            // re-read the keychain once for a fresh token, then retry.
+            cachedToken = nil
+            do {
+                return try await fetchUsage(token: try readTokenFromKeychainAndCache())
+            } catch {
+                if let cached = cachedUsage { return .success(cached) }
+                return .failure(.keychainUnavailable)
+            }
         } catch let Failure.http(429) {
             rateLimitStreak += 1
             let delay = min(initialBackoff * pow(2, Double(rateLimitStreak - 1)), maxBackoff)
@@ -154,10 +168,35 @@ public actor UsageApiClient {
         }
     }
 
+    /// Calls the usage endpoint, records the snapshot on success, and returns it.
+    /// Throws `Failure` (incl. `.http(429)`/`.http(401)`) so `fetch` can react.
+    private func fetchUsage(token: String) async throws -> Result<SubscriptionUsage, Failure> {
+        var usage = try await callUsage(token: token)
+        usage.fetchedAt = Date()
+        cachedUsage = usage
+        saveDiskCache(usage)
+        rateLimitStreak = 0
+        rateLimitedUntil = nil
+        return .success(usage)
+    }
+
     // MARK: - Keychain
 
     private struct Credentials: Sendable {
         var accessToken: String
+        /// Access-token expiry (ms since epoch, Claude Code's convention). Used
+        /// to decide when the in-memory token cache must re-read the keychain.
+        var expiresAtMs: Double?
+    }
+
+    /// Reads a fresh token from the keychain (may prompt) and caches it in memory
+    /// keyed by its own expiry, so subsequent fetches reuse it without a read.
+    private func readTokenFromKeychainAndCache() throws -> String {
+        let creds = try loadCredentials()
+        let expiry = creds.expiresAtMs.map { Date(timeIntervalSince1970: $0 / 1000) }
+            ?? Date().addingTimeInterval(3600)   // fallback: assume ~1h
+        cachedToken = (creds.accessToken, expiry)
+        return creds.accessToken
     }
 
     /// Reads the `Claude Code-credentials` keychain entry and decodes the wrapped
@@ -181,7 +220,9 @@ public actor UsageApiClient {
         else {
             throw Failure.credentialsMalformed
         }
-        return Credentials(accessToken: access)
+        let expiresAtMs = (inner["expiresAt"] as? Double)
+            ?? (inner["expiresAt"] as? Int).map(Double.init)
+        return Credentials(accessToken: access, expiresAtMs: expiresAtMs)
     }
 
     // MARK: - Usage endpoint
@@ -234,6 +275,25 @@ public actor UsageApiClient {
             throw Failure.decoding
         }
 
+        // Per-model weekly caps now arrive in the `limits` array as
+        // `weekly_scoped` entries carrying `scope.model.display_name` (e.g.
+        // Fable) — the old top-level `seven_day_sonnet/opus` keys are now null.
+        let scoped: [SubscriptionUsage.ScopedWindow] = (obj["limits"] as? [[String: Any]] ?? [])
+            .compactMap { lim in
+                guard (lim["kind"] as? String) == "weekly_scoped",
+                      let scope = lim["scope"] as? [String: Any],
+                      let model = scope["model"] as? [String: Any],
+                      let name = model["display_name"] as? String, !name.isEmpty,
+                      let pct = (lim["percent"] as? Double) ?? (lim["percent"] as? Int).map(Double.init),
+                      let resetsRaw = lim["resets_at"] as? String,
+                      let resetsAt = Self.parseISO8601(resetsRaw)
+                else { return nil }
+                return SubscriptionUsage.ScopedWindow(
+                    modelName: name,
+                    window: SubscriptionUsage.Window(utilization: pct, resetsAt: resetsAt)
+                )
+            }
+
         let extra: SubscriptionUsage.ExtraUsage? = (obj["extra_usage"] as? [String: Any]).map {
             SubscriptionUsage.ExtraUsage(
                 isEnabled: ($0["is_enabled"] as? Bool) ?? false,
@@ -249,6 +309,7 @@ public actor UsageApiClient {
             sevenDay: seven,
             sevenDayOpus: window("seven_day_opus"),
             sevenDaySonnet: window("seven_day_sonnet"),
+            scopedModels: scoped.isEmpty ? nil : scoped,
             extraUsage: extra,
             fetchedAt: Date()
         )

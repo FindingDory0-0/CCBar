@@ -319,18 +319,6 @@ struct PopoverView: View {
                 }
             }
             Divider()
-            Button {
-                appModel.allowUsageKeychainAccess()
-            } label: {
-                VStack(alignment: .leading) {
-                    Text("사용량 키체인 접근 허용")
-                    Text("\"키 접근 허용\" 팝업이 반복되면 한 번 실행 (암호 1회)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .disabled(appModel.keychainGrantInProgress)
-            Divider()
             Button("업데이트 확인…") {
                 appModel.updater.checkForUpdates()
             }

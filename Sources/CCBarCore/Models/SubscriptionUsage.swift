@@ -14,6 +14,10 @@ public struct SubscriptionUsage: Sendable, Hashable, Codable {
     public var sevenDayOpus: Window?
     /// Sonnet-only weekly window. Nil if not applicable.
     public var sevenDaySonnet: Window?
+    /// Per-model weekly caps the API now reports via its `limits` array as
+    /// `weekly_scoped` entries (e.g. Fable). Ordered as returned. Optional so
+    /// older cached snapshots still decode.
+    public var scopedModels: [ScopedWindow]?
     /// Pay-as-you-go credit usage. Often `is_enabled == false`.
     public var extraUsage: ExtraUsage?
     /// When this snapshot was fetched from the server. Drives the local 30s cache.
@@ -31,6 +35,18 @@ public struct SubscriptionUsage: Sendable, Hashable, Codable {
         }
     }
 
+    /// A weekly cap scoped to a single model (from the API's `limits` array).
+    public struct ScopedWindow: Sendable, Hashable, Codable {
+        /// Model display name, e.g. "Fable", "Sonnet", "Opus".
+        public var modelName: String
+        public var window: Window
+
+        public init(modelName: String, window: Window) {
+            self.modelName = modelName
+            self.window = window
+        }
+    }
+
     public struct ExtraUsage: Sendable, Hashable, Codable {
         public var isEnabled: Bool
         public var monthlyLimit: Double?
@@ -44,6 +60,7 @@ public struct SubscriptionUsage: Sendable, Hashable, Codable {
         sevenDay: Window,
         sevenDayOpus: Window? = nil,
         sevenDaySonnet: Window? = nil,
+        scopedModels: [ScopedWindow]? = nil,
         extraUsage: ExtraUsage? = nil,
         fetchedAt: Date = Date()
     ) {
@@ -51,6 +68,7 @@ public struct SubscriptionUsage: Sendable, Hashable, Codable {
         self.sevenDay = sevenDay
         self.sevenDayOpus = sevenDayOpus
         self.sevenDaySonnet = sevenDaySonnet
+        self.scopedModels = scopedModels
         self.extraUsage = extraUsage
         self.fetchedAt = fetchedAt
     }

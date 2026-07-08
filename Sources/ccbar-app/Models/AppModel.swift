@@ -696,59 +696,6 @@ final class AppModel {
         }
     }
 
-    /// True while the keychain-grant password dialog is up (disables the button).
-    private(set) var keychainGrantInProgress = false
-
-    /// User tapped "사용량 키체인 접근 허용". Relaxes Claude Code's credential
-    /// item read-ACL to allow-all so the recurring "키 접근 허용" popup stops for
-    /// good (see `KeychainAccessGrant`). One password dialog, run off-main; then
-    /// refresh usage and toast the outcome.
-    func allowUsageKeychainAccess() {
-        guard !keychainGrantInProgress else { return }
-        keychainGrantInProgress = true
-        Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                KeychainAccessGrant.allowAllApplicationsToRead()
-            }.value
-            keychainGrantInProgress = false
-            switch result {
-            case .success:
-                await refreshUsage(force: true)
-                toaster.show(ToastContent(
-                    kind: .completed,
-                    title: "키체인 접근을 허용했습니다",
-                    subtitle: nil,
-                    body: "이제 사용량 \"키 접근\" 팝업이 더 뜨지 않습니다.",
-                    sessionID: nil
-                ))
-            case .failure(let err):
-                toaster.show(ToastContent(
-                    kind: .waiting,
-                    title: "키체인 접근 허용 실패",
-                    subtitle: nil,
-                    body: keychainGrantFailureMessage(err),
-                    sessionID: nil
-                ))
-            }
-        }
-    }
-
-    private func keychainGrantFailureMessage(_ err: KeychainAccessGrant.GrantError) -> String {
-        if err.isUserCancel {
-            return "취소되었습니다. 메뉴에서 한 번 더 실행하면 됩니다."
-        }
-        switch err {
-        case .itemNotFound:
-            return "Claude Code 로그인 정보가 키체인에 없습니다. 먼저 Claude Code 에 로그인하세요."
-        case .saveFailed(let s):
-            return "키체인 저장 실패 (\(s)). 로그인 키체인 암호를 확인하세요."
-        case .accessReadFailed(let s):
-            return "키체인 ACL 읽기 실패 (\(s))."
-        case .noReadACL:
-            return "예상한 읽기 ACL 을 찾지 못했습니다."
-        }
-    }
-
     // MARK: - Background loops
 
     private func attachWatcher() {

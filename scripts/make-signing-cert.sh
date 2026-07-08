@@ -12,10 +12,9 @@
 #   builds shouldn't carry someone else's identity.
 #
 # WHAT this is NOT for: the recurring usage-bar "키 접근 허용" keychain popup.
-#   That is an *item-ACL* problem, NOT a signing problem (the keychain pins
-#   trusted apps by changing identity, unrelated to cert trust). Fix it with the
-#   app's ⚙ → "사용량 키체인 접근 허용" button (Sources/CCBarCore/Usage/
-#   KeychainAccessGrant.swift), or Keychain Access → "Allow all applications".
+#   That popup is a macOS keychain *partition list* limitation for non-notarized
+#   apps and CANNOT be fixed by signing (or by any in-app ACL edit). It's just
+#   accepted; the bars read in real time and the prompt occasionally reappears.
 #   See CLAUDE.md trap #7. (Earlier versions of this header wrongly claimed the
 #   trusted cert fixed the keychain popup — it doesn't.)
 #
