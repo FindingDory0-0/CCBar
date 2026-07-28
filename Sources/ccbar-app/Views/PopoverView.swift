@@ -23,6 +23,11 @@ struct PopoverView: View {
     /// Whether the "최근" section is expanded. Default collapsed so active sessions
     /// stay above the fold. State persists for the lifetime of the popover view.
     @State private var showRecent: Bool = false
+    /// How many ended sessions are currently rendered in the "최근" section.
+    /// Starts at `recentEndedLimit`; the "더 보기" button grows it by
+    /// `recentPageSize`. Reset back when the section is collapsed.
+    @State private var recentShown: Int = 8
+    private let recentPageSize = 20
 
     /// Search query. Filters by alias, ai-title, cwd path, and last message
     /// previews (case-insensitive substring).
@@ -57,9 +62,12 @@ struct PopoverView: View {
             : baseVisible
         let active = filtered.filter { $0.status != .ended }.count
         let recentTotal = filtered.filter { $0.status == .ended }.count
-        let recentLimit = isSearching ? searchEndedLimit : recentEndedLimit
+        let recentLimit = isSearching ? searchEndedLimit : recentShown
         let recentExpanded = isSearching || showRecent
         let recentVisible = recentExpanded ? min(recentTotal, recentLimit) : 0
+        // "더 보기" row shown when the expanded list is truncated (not searching).
+        let moreRowHeight: CGFloat =
+            (recentExpanded && !isSearching && recentTotal > recentVisible) ? 32 : 0
 
         // Chrome: title bar 36 + search bar 48 + usage card ~110 + paddings ~32
         let chromeHeight: CGFloat = 36 + 48 + 110 + 32
@@ -78,7 +86,7 @@ struct PopoverView: View {
             return 36 + CGFloat(rows) * 26
         }()
 
-        let ideal = chromeHeight + labels + cardsHeight + favoritesHeight
+        let ideal = chromeHeight + labels + cardsHeight + favoritesHeight + moreRowHeight
         let screen = NSScreen.main?.visibleFrame.height ?? 800
         let cap = screen * 0.9
         return min(max(ideal, DT.popoverMinHeight), cap)
@@ -359,8 +367,9 @@ struct PopoverView: View {
         let active = visible.filter { $0.status != .ended }
         let endedAll = visible.filter { $0.status == .ended }
         // Lift the "최근" limit during search — the user is hunting for a specific
-        // session and shouldn't have to expand the section first.
-        let limit = isSearching ? searchEndedLimit : recentEndedLimit
+        // session and shouldn't have to expand the section first. Outside search
+        // the limit is user-growable via the "더 보기" button.
+        let limit = isSearching ? searchEndedLimit : recentShown
         let endedVisible = endedAll.prefix(limit)
         // Also auto-expand the "최근" section during search so results are visible.
         let recentExpanded = isSearching || showRecent
@@ -377,8 +386,13 @@ struct PopoverView: View {
             if !endedAll.isEmpty {
                 recentToggle(visible: endedVisible.count, total: endedAll.count)
                 if recentExpanded {
-                    VStack(spacing: DT.cardSpacing) {
+                    // Lazy so growing the list via "더 보기" stays cheap even with
+                    // hundreds of cards (e.g. claude -p sessions toggled on).
+                    LazyVStack(spacing: DT.cardSpacing) {
                         ForEach(endedVisible) { SessionCard(session: $0) }
+                    }
+                    if !isSearching, endedAll.count > endedVisible.count {
+                        loadMoreButton(remaining: endedAll.count - endedVisible.count)
                     }
                 }
             }
@@ -406,6 +420,8 @@ struct PopoverView: View {
         Button {
             withAnimation(.easeInOut(duration: 0.18)) {
                 showRecent.toggle()
+                // Collapsing resets pagination so the next expand starts small.
+                if !showRecent { recentShown = recentEndedLimit }
             }
         } label: {
             HStack(spacing: 6) {
@@ -430,6 +446,26 @@ struct PopoverView: View {
     private func formatCount(visible: Int, total: Int) -> String {
         // Show "(8 / 4,823)" when truncated, just "(N)" when everything fits.
         total > visible ? "\(visible) / \(total.formatted())" : "\(total)"
+    }
+
+    /// Grows the "최근" section by `recentPageSize` per click.
+    private func loadMoreButton(remaining: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                recentShown += recentPageSize
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.down.circle")
+                Text("더 보기 (\(min(remaining, recentPageSize).formatted())개 · 남은 \(remaining.formatted())개)")
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
     }
 
     /// Case-insensitive substring match across display name, ai-title, cwd path,
