@@ -196,6 +196,10 @@ public actor UsageApiClient {
         let expiry = creds.expiresAtMs.map { Date(timeIntervalSince1970: $0 / 1000) }
             ?? Date().addingTimeInterval(3600)   // fallback: assume ~1h
         cachedToken = (creds.accessToken, expiry)
+        // Keychain reads are exactly when the "키 접근 허용" prompt can appear, so
+        // this line doubles as the popup's audit trail in /tmp/ccbar-debug.log.
+        let cacheFor = Int(expiry.timeIntervalSinceNow)
+        NSLog("%@", "CCBar keychain READ (token cache miss) — cacheFor=\(cacheFor)s")
         return creds.accessToken
     }
 

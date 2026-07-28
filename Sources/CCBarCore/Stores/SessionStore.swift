@@ -185,12 +185,30 @@ public actor SessionStore {
 
         // Pass 0: hook-provided TTY wins. Authoritative because the claude
         // process itself told us its TTY at hook-fire time.
+        //
+        // A TTY names ONE live process, so it can back at most ONE session.
+        // Terminals get reused: every past session run in the same window
+        // carries the same hookProvidedTTY, and claiming all of them would
+        // resurrect long-ended sessions as active (the "활성 목록이 열린 창보다
+        // 많다" bug — weeks of ended sessions all pinned to a reused TTY).
+        // Per TTY, claim only the most recently active candidate; the rest
+        // fall through unclaimed and get marked .ended below.
+        var candidatesByTTY: [String: [UUID]] = [:]
         for (id, entry) in entries {
-            guard let hookTTY = entry.hookProvidedTTY,
-                  let proc = processes.first(where: { $0.tty == hookTTY })
-            else { continue }
-            claim(id: id, with: proc, into: &claimed)
-            consumedPIDs.insert(proc.pid)
+            if let tty = entry.hookProvidedTTY {
+                candidatesByTTY[tty, default: []].append(id)
+            }
+        }
+        for (tty, ids) in candidatesByTTY {
+            guard let proc = processes.first(where: { $0.tty == tty }) else { continue }
+            let best = ids.max {
+                (entries[$0]?.session.lastActivity ?? .distantPast)
+                    < (entries[$1]?.session.lastActivity ?? .distantPast)
+            }
+            if let best {
+                claim(id: best, with: proc, into: &claimed)
+                consumedPIDs.insert(proc.pid)
+            }
         }
 
         // Pass 1: exact lsof-catch.
