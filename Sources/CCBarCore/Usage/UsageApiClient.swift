@@ -173,6 +173,7 @@ public actor UsageApiClient {
     private func fetchUsage(token: String) async throws -> Result<SubscriptionUsage, Failure> {
         var usage = try await callUsage(token: token)
         usage.fetchedAt = Date()
+        NSLog("CCBar usage fetched — 5h=\(Int(usage.fiveHour.utilization))%")
         cachedUsage = usage
         saveDiskCache(usage)
         rateLimitStreak = 0

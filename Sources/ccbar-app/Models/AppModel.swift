@@ -713,6 +713,7 @@ final class AppModel {
             usage = u
             usageError = nil
         case .failure(let f):
+            NSLog("CCBar usage fetch failed: \(f)")
             usageError = f
             // Intentionally leave `usage` alone — UI prefers stale-but-real over nothing.
         }

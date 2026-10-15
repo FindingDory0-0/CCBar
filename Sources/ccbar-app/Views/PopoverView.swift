@@ -114,9 +114,15 @@ struct PopoverView: View {
         // so cards stand out clearly regardless of what's behind the menu bar.
         .background(DT.popoverBackground)
         .task {
-            await appModel.refreshUsage()
             appModel.refreshAccessibilityTrust()
             appModel.refreshLaunchAtLogin()
+        }
+        // Usage refresh lives here, not in `.task`: MenuBarExtra keeps this
+        // view alive between opens, so `.task` only fires on the first
+        // appearance and usage froze at the launch-time value. The popover
+        // window becoming key fires on every open, including the first.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            Task { await appModel.refreshUsage() }
         }
     }
 
