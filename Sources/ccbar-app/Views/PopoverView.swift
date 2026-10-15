@@ -32,6 +32,9 @@ struct PopoverView: View {
     /// Search query. Filters by alias, ai-title, cwd path, and last message
     /// previews (case-insensitive substring).
     @State private var searchText: String = ""
+    /// Visible height of the screen the popover is on (reported by
+    /// `PopoverWindowPinner`). Nil until the window is attached.
+    @State private var popoverScreenHeight: CGFloat?
 
     /// How many ended sessions to show beneath the active ones when expanded.
     private let recentEndedLimit = 8
@@ -44,50 +47,21 @@ struct PopoverView: View {
     //
     // MenuBarExtra (.window style) doesn't let the user drag-resize the popover.
     // We size the window to fit content, up to 90 % of the visible screen.
+    //
+    // Heights are *measured* from the laid-out views, not estimated. The old
+    // per-card estimate (88pt) undershot two-line previews — a scrollbar
+    // appeared on open — and overshot short lists, leaving blank space.
 
-    /// Approximate height of one SessionCard incl. inter-row spacing.
-    /// Update if the card layout changes meaningfully.
-    private let estimatedCardHeight: CGFloat = 88
+    /// Measured height of the fixed parts: title bar, search bar, a11y banner.
+    @State private var headerHeight: CGFloat = 0
+    /// Measured natural height of the scrollable content (usage + sessions).
+    @State private var contentHeight: CGFloat = 0
+    /// Measured height of the favorites strip (0 when hidden).
+    @State private var favoritesHeight: CGFloat = 0
 
     private var dynamicHeight: CGFloat {
-        // Apply the same filters the view uses, so the popover only sizes
-        // itself for what's actually drawn.
-        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isSearching = !trimmedQuery.isEmpty
-        let baseVisible = appModel.preferences.showNonInteractive
-            ? appModel.sessions
-            : appModel.sessions.filter { $0.isInteractive }
-        let filtered = isSearching
-            ? baseVisible.filter { matches($0, query: trimmedQuery) }
-            : baseVisible
-        let active = filtered.filter { $0.status != .ended }.count
-        let recentTotal = filtered.filter { $0.status == .ended }.count
-        let recentLimit = isSearching ? searchEndedLimit : recentShown
-        let recentExpanded = isSearching || showRecent
-        let recentVisible = recentExpanded ? min(recentTotal, recentLimit) : 0
-        // "더 보기" row shown when the expanded list is truncated (not searching).
-        let moreRowHeight: CGFloat =
-            (recentExpanded && !isSearching && recentTotal > recentVisible) ? 32 : 0
-
-        // Chrome: title bar 36 + search bar 48 + usage card ~110 + paddings ~32
-        let chromeHeight: CGFloat = 36 + 48 + 110 + 32
-        // Section labels: 활성 (always when active>0) + 최근 (always when recentTotal>0)
-        let labels: CGFloat = (active > 0 ? 28 : 0) + (recentTotal > 0 ? 28 : 0)
-        let cardsHeight = CGFloat(active + recentVisible) * estimatedCardHeight
-        // FavoritesStrip is hidden when there are no favorites; otherwise we
-        // estimate how many rows the chips will wrap into. Conservative
-        // assumption: ~4 chips per row at popover width 420.
-        let favoriteCount = appModel.sidecar.favoriteSessions.count
-        let favoritesHeight: CGFloat = {
-            guard favoriteCount > 0 else { return 0 }
-            let chipsPerRow = 4
-            let rows = (favoriteCount + chipsPerRow - 1) / chipsPerRow
-            // 36 = header label + padding; 26 per chip row
-            return 36 + CGFloat(rows) * 26
-        }()
-
-        let ideal = chromeHeight + labels + cardsHeight + favoritesHeight + moreRowHeight
-        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        let ideal = (headerHeight + contentHeight + favoritesHeight).rounded(.up)
+        let screen = popoverScreenHeight ?? NSScreen.main?.visibleFrame.height ?? 800
         let cap = screen * 0.9
         return min(max(ideal, DT.popoverMinHeight), cap)
     }
@@ -96,9 +70,12 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            titleBar
-            searchBar
-            accessibilityBanner   // hides itself when permission is granted
+            VStack(alignment: .leading, spacing: 0) {
+                titleBar
+                searchBar
+                accessibilityBanner   // hides itself when permission is granted
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
             ScrollView {
                 VStack(alignment: .leading, spacing: DT.sectionSpacing) {
                     usageCard
@@ -106,13 +83,18 @@ struct PopoverView: View {
                 }
                 .padding(.horizontal, DT.popoverPadding)
                 .padding(.vertical, DT.popoverPadding)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
             FavoritesStrip()   // hides itself when there are no favorites
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { favoritesHeight = $0 }
         }
         .frame(width: DT.popoverWidth, height: dynamicHeight)
         // Solid popover surface — overrides the default MenuBarExtra vibrancy
         // so cards stand out clearly regardless of what's behind the menu bar.
         .background(DT.popoverBackground)
+        .background(PopoverWindowPinner(height: dynamicHeight) { h in
+            if popoverScreenHeight != h { popoverScreenHeight = h }
+        })
         .task {
             appModel.refreshAccessibilityTrust()
             appModel.refreshLaunchAtLogin()
