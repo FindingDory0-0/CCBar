@@ -149,6 +149,24 @@ _Auto-update is live — future versions install themselves via Sparkle._]]></de
 _Auto-update is live — future versions install themselves via Sparkle._]]></description>
       <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.9/CCBar-0.1.9.zip" sparkle:edSignature="j2DlbzgcQ5esuPVvikFgcvmnF1pFY8FB+9qxhWG3AhIFe5Mko9Rcavmi4G+uhQG2afSdPU0M4tY4A2F3eaiHCQ==" length="2098022" type="application/octet-stream" />
     </item>
+    <item>
+      <title>CCBar 0.1.10</title>
+      <sparkle:version>0.1.10</sparkle:version>
+      <sparkle:shortVersionString>0.1.10</sparkle:shortVersionString>
+      <pubDate>2026-10-15T13:19:26Z</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[CCBar 0.1.10
+
+사용량 갱신 수정: 메뉴바 팝오버를 다시 열 때마다 사용량이 새로 조회됩니다(이전에는 앱 실행 직후 값에 멈춰 있었음).
+
+### Install
+1. Download `CCBar-0.1.10.zip` below
+2. Unzip → drag `CCBar.app` to `/Applications`
+3. First launch will ask for Accessibility + Apple Events permissions
+
+_Auto-update is live — future versions install themselves via Sparkle._]]></description>
+      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.10/CCBar-0.1.10.zip" sparkle:edSignature="pq6UfHzi/oPimujtZJh6aXrHKOgi5VSXaKPWRPlcVwmaIk9VbRT8LuVfld199195vgtS/1e5sTAAKjRtYY5sCg==" length="2100943" type="application/octet-stream" />
+    </item>
 
   </channel>
 </rss>
