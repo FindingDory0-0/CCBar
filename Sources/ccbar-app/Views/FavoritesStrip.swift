@@ -103,6 +103,9 @@ struct FavoritesStrip: View {
             Divider()
             Button("작업 디렉토리 복사") { copyToPasteboard(session.cwd.path) }
             Button("Finder에서 열기") { revealInFinder(session.cwd) }
+            Button(appModel.isMuted(sessionID: session.id) ? "알림 켜기" : "알림 끄기") {
+                Task { await appModel.toggleMuted(sessionID: session.id) }
+            }
             Divider()
             Button("즐겨찾기에서 제거", role: .destructive) {
                 Task { await appModel.toggleFavorite(sessionID: session.id) }

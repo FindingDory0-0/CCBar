@@ -100,6 +100,9 @@ final class AppModel {
         t.onOpen = { [weak self] sessionID in
             self?.requestPopoverOpen(focusing: sessionID)
         }
+        t.onMute = { [weak self] sessionID in
+            Task { await self?.toggleMuted(sessionID: sessionID) }
+        }
         return t
     }()
 
@@ -287,6 +290,12 @@ final class AppModel {
         // Honor the "show -p sessions" preference for toasts too — no point
         // surfacing a one-shot sdk-cli completion if the user said "hide those".
         if let session, !session.isInteractive, !preferences.showNonInteractive {
+            return
+        }
+
+        // Per-session mute (card / toast context menu "알림 끄기").
+        if let id = event.sessionID, isMuted(sessionID: id) {
+            NSLog("CCBar toast muted session=\(id.uuidString)")
             return
         }
 
@@ -658,6 +667,19 @@ final class AppModel {
             sidecar = await sidecarStore.current()
         } catch {
             NSLog("setAlias failed: \(error)")
+        }
+    }
+
+    func isMuted(sessionID: UUID) -> Bool {
+        sidecar.mutedSessions.contains(sessionID)
+    }
+
+    func toggleMuted(sessionID: UUID) async {
+        do {
+            try await sidecarStore.toggleMuted(sessionID: sessionID)
+            sidecar = await sidecarStore.current()
+        } catch {
+            NSLog("toggleMuted failed: \(error)")
         }
     }
 

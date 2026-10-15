@@ -52,6 +52,8 @@ struct ToastView: View {
     let content: ToastContent
     let onOpen: () -> Void
     let onDismiss: () -> Void
+    /// Nil when the toast isn't tied to a known session (nothing to mute).
+    let onMute: (() -> Void)?
     let onHoverChange: (Bool) -> Void
 
     var body: some View {
@@ -74,6 +76,11 @@ struct ToastView: View {
                 card
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                if let onMute {
+                    Button("이 세션 알림 끄기", action: onMute)
+                }
+            }
 
             closeButton
                 .padding(8)
@@ -146,7 +153,7 @@ struct ToastView: View {
         // Shadow is drawn by NSPanel.hasShadow (see ToastWindowController). Using
         // SwiftUI's .shadow here leaked grey artifacts outside the rounded edges
         // because the shadow lives outside NSHostingView's frame and got clipped.
-        .help("클릭하여 열기")
+        .help("클릭하여 열기 · 우클릭으로 이 세션 알림 끄기")
     }
 }
 

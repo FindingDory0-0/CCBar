@@ -71,6 +71,12 @@ struct SessionCard: View {
                     .foregroundStyle(.yellow)
                     .help("즐겨찾는 세션")
             }
+            if appModel.isMuted(sessionID: session.id) && !isRenaming {
+                Image(systemName: "bell.slash.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .help("알림 꺼짐")
+            }
 
             if isRenaming {
                 TextField(session.defaultDisplayName, text: $renameInput)
@@ -181,6 +187,9 @@ struct SessionCard: View {
         Divider()
         Button(appModel.isFavorite(sessionID: session.id) ? "즐겨찾기 해제" : "즐겨찾기 추가") {
             Task { await appModel.toggleFavorite(sessionID: session.id) }
+        }
+        Button(appModel.isMuted(sessionID: session.id) ? "알림 켜기" : "알림 끄기") {
+            Task { await appModel.toggleMuted(sessionID: session.id) }
         }
         Divider()
         Button("작업 디렉토리 복사") {

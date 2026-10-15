@@ -20,17 +20,23 @@ public struct Sidecar: Codable, Sendable, Hashable {
     /// in `~/Documents/AI/etc`) don't have to re-name every fresh `claude` run.
     /// Cleared when the user explicitly resets a session's alias.
     public var cwdAliases: [URL: String]
+    /// Sessions whose Stop / Notification toasts are muted. Per session UUID
+    /// (same keying as aliases) — `claude -c` keeps the session id, so the
+    /// mute follows the conversation into the resumed window.
+    public var mutedSessions: Set<UUID>
 
     public init(
         aliases: [UUID: String] = [:],
         favoriteSessions: Set<UUID> = [],
         manualHostBinding: [UUID: HostHint] = [:],
-        cwdAliases: [URL: String] = [:]
+        cwdAliases: [URL: String] = [:],
+        mutedSessions: Set<UUID> = []
     ) {
         self.aliases = aliases
         self.favoriteSessions = favoriteSessions
         self.manualHostBinding = manualHostBinding
         self.cwdAliases = cwdAliases
+        self.mutedSessions = mutedSessions
     }
 
     /// Decode with backwards compatibility — `cwdAliases` is new, older sidecar
@@ -42,6 +48,7 @@ public struct Sidecar: Codable, Sendable, Hashable {
         favoriteSessions = (try? c.decode(Set<UUID>.self, forKey: .favoriteSessions)) ?? []
         manualHostBinding = (try? c.decode([UUID: HostHint].self, forKey: .manualHostBinding)) ?? [:]
         cwdAliases = (try? c.decode([URL: String].self, forKey: .cwdAliases)) ?? [:]
+        mutedSessions = (try? c.decode(Set<UUID>.self, forKey: .mutedSessions)) ?? []
     }
 
     public static let empty = Sidecar()
@@ -104,6 +111,15 @@ public actor SidecarStore {
             cache.favoriteSessions.remove(sessionID)
         } else {
             cache.favoriteSessions.insert(sessionID)
+        }
+        try save()
+    }
+
+    public func toggleMuted(sessionID: UUID) throws {
+        if cache.mutedSessions.contains(sessionID) {
+            cache.mutedSessions.remove(sessionID)
+        } else {
+            cache.mutedSessions.insert(sessionID)
         }
         try save()
     }

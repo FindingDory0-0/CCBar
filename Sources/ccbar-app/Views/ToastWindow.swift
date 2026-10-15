@@ -35,6 +35,8 @@ final class ToastWindowController {
 
     /// Invoked when the user clicks the card body (`onOpen` action).
     var onOpen: ((_ sessionID: UUID?) -> Void)?
+    /// Invoked from the toast's context menu "이 세션 알림 끄기".
+    var onMute: ((_ sessionID: UUID) -> Void)?
 
     func bind(preferences: Preferences) {
         self.preferences = preferences
@@ -54,6 +56,12 @@ final class ToastWindowController {
             },
             onDismiss: { [weak self] in
                 self?.dismissToast(id: id)
+            },
+            onMute: content.sessionID.map { sessionID in
+                { [weak self] in
+                    self?.onMute?(sessionID)
+                    self?.dismissToast(id: id)
+                }
             },
             onHoverChange: { [weak self] hovered in
                 self?.setHovered(hovered, for: id)
