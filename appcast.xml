@@ -185,6 +185,24 @@ _Auto-update is live — future versions install themselves via Sparkle._]]></de
 _Auto-update is live — future versions install themselves via Sparkle._]]></description>
       <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.11/CCBar-0.1.11.zip" sparkle:edSignature="X8URQPyMdf2C2i7cP0P20OjdyGBOMpnQ5/olTMyKNOIsIW8VtZYSx/uRM24DyFGaoiEYuk8e8DS1E5hWbQLYDw==" length="2112720" type="application/octet-stream" />
     </item>
+    <item>
+      <title>CCBar 0.1.12</title>
+      <sparkle:version>0.1.12</sparkle:version>
+      <sparkle:shortVersionString>0.1.12</sparkle:shortVersionString>
+      <pubDate>2026-11-03T23:54:51Z</pubDate>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[CCBar 0.1.12
+
+사용량 수정: 최근 5시간 동안 사용하지 않아 5시간 구간이 없을 때 '응답 디코딩 실패'가 뜨던 문제를 고쳤습니다(0% · '사용 전'으로 표시).
+
+### Install
+1. Download `CCBar-0.1.12.zip` below
+2. Unzip → drag `CCBar.app` to `/Applications`
+3. First launch will ask for Accessibility + Apple Events permissions
+
+_Auto-update is live — future versions install themselves via Sparkle._]]></description>
+      <enclosure url="https://github.com/FindingDory0-0/CCBar/releases/download/v0.1.12/CCBar-0.1.12.zip" sparkle:edSignature="9ddXhrjU64G7OWBv/0uA9p6nHMzVH+YOc2Nz0vx6IEJfPBe5istKn9boLuNeFlBYK3ScRgjiGLSfBYukJktICA==" length="2116807" type="application/octet-stream" />
+    </item>
 
   </channel>
 </rss>
