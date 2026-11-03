@@ -276,7 +276,18 @@ public actor UsageApiClient {
             return SubscriptionUsage.Window(utilization: util, resetsAt: resetsAt)
         }
 
-        guard let five = window("five_hour"), let seven = window("seven_day") else {
+        // A window key that is present but null means no window is running
+        // (e.g. `five_hour` after 5h without usage, seen 2026-11-04): that's
+        // 0% with nothing to reset, not a malformed response.
+        func windowOrIdle(_ key: String) -> SubscriptionUsage.Window? {
+            if let w = window(key) { return w }
+            if obj[key] is NSNull { return SubscriptionUsage.Window(utilization: 0, resetsAt: nil) }
+            return nil
+        }
+
+        guard let five = windowOrIdle("five_hour"), let seven = windowOrIdle("seven_day") else {
+            let snippet = String(data: data, encoding: .utf8)?.prefix(300) ?? ""
+            NSLog("CCBar usage decoding failed  body=\(snippet)")
             throw Failure.decoding
         }
 

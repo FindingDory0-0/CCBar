@@ -178,7 +178,8 @@ struct UsageBars: View {
     /// `RelativeDateTimeFormatter` always rounds to a single unit ("1시간 후"
     /// even when 38 minutes are left), which made the bar look stale. We format
     /// two units manually so the user can see exactly when the window resets.
-    private func resetLabel(_ date: Date) -> String {
+    private func resetLabel(_ date: Date?) -> String {
+        guard let date else { return "사용 전" }
         let seconds = Int(date.timeIntervalSinceNow)
         if seconds <= 0 { return "곧 리셋" }
 
@@ -195,7 +196,8 @@ struct UsageBars: View {
         return "\(max(minutes, 1))분 후"
     }
 
-    private func absoluteReset(_ date: Date) -> String {
+    private func absoluteReset(_ date: Date?) -> String {
+        guard let date else { return "진행 중인 구간 없음 — 사용을 시작하면 집계됩니다" }
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm"
         return "\(f.string(from: date))에 리셋"

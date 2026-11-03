@@ -27,9 +27,11 @@ public struct SubscriptionUsage: Sendable, Hashable, Codable {
         /// 0~100 percentage of the window consumed.
         public var utilization: Double
         /// Timestamp when this window resets and `utilization` returns to 0.
-        public var resetsAt: Date
+        /// Nil when no window is running — the API sends `"five_hour": null`
+        /// when nothing was used in the last 5h (seen 2026-11-04).
+        public var resetsAt: Date?
 
-        public init(utilization: Double, resetsAt: Date) {
+        public init(utilization: Double, resetsAt: Date?) {
             self.utilization = utilization
             self.resetsAt = resetsAt
         }
